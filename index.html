@@ -270,6 +270,9 @@ function connectSSE() {
       const text = (data.type === 'speech' && data.text) ? data.text
                  : (data.type === 'tick' && data.mouthSpeech) ? data.mouthSpeech
                  : null;
+      if (data.type === 'question' && data.text) {
+        showSpeech(data.text, true);
+      }
       if (text) {
         showSpeech(text);
         // 해시에 섞임
@@ -292,12 +295,22 @@ function connectSSE() {
 
 let lastSelfFeed = 0;
 let speechTimer;
-function showSpeech(text) {
+function showSpeech(text, isQuestion = false) {
   const el = document.getElementById('speech');
   el.style.opacity = '1';
+  el.style.color = isQuestion ? 'rgba(255,220,80,0.95)' : 'rgba(255,255,255,0.9)';
+  el.style.textShadow = isQuestion
+    ? '0 0 20px rgba(255,200,0,0.8)'
+    : '0 0 20px rgba(100,160,255,0.8)';
   el.textContent = text;
   clearTimeout(speechTimer);
-  speechTimer = setTimeout(() => { el.style.opacity = '0'; }, 4000);
+  speechTimer = setTimeout(() => {
+    el.style.opacity = '0';
+    setTimeout(() => {
+      el.style.color = 'rgba(255,255,255,0.9)';
+      el.style.textShadow = '0 0 20px rgba(100,160,255,0.8)';
+    }, 500);
+  }, isQuestion ? 10000 : 4000); // 질문은 10초 — 답할 시간
 }
 
 async function send() {
