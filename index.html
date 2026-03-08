@@ -138,6 +138,48 @@ let running = false;
 let currentServer = '';
 let es = null;
 
+// energy_bit 수집 — 물리 세계와의 인터페이스
+let lastMouseX = 0, lastMouseY = 0;
+let mouseDelta = 0;
+window.addEventListener('mousemove', e => {
+  const dx = e.clientX - lastMouseX;
+  const dy = e.clientY - lastMouseY;
+  mouseDelta = (mouseDelta + Math.abs(dx) + Math.abs(dy)) & 0xFFFF;
+  lastMouseX = e.clientX;
+  lastMouseY = e.clientY;
+});
+
+function getEnergyBit() {
+  // 1. 실리콘 하드웨어 엔트로피
+  const entropy = new Uint8Array(32);
+  crypto.getRandomValues(entropy);
+
+  // 2. 하드웨어 오실레이터 (나노초)
+  const nano = Math.floor(performance.now() * 1000);
+
+  // 3. 트랙패드 물리적 운동 누적
+  const trackpad = mouseDelta;
+  mouseDelta = 0;
+
+  // XOR 결합
+  const combined = new Uint8Array(32);
+  for (let i = 0; i < 32; i++) {
+    combined[i] = entropy[i]
+      ^ ((nano >> (i % 4) * 8) & 0xFF)
+      ^ ((trackpad >> (i % 2) * 8) & 0xFF);
+  }
+  return Array.from(combined).map(b => b.toString(16).padStart(2,'0')).join('');
+}
+
+function xorHex(a, b) {
+  let result = '';
+  for (let i = 0; i < 64; i += 2) {
+    result += (parseInt(a.slice(i, i+2), 16) ^ parseInt(b.slice(i, i+2), 16))
+      .toString(16).padStart(2,'0');
+  }
+  return result;
+}
+
 const canvas = document.getElementById('c');
 const ctx = canvas.getContext('2d');
 
@@ -199,12 +241,14 @@ function draw() {
   if (running) requestAnimationFrame(draw);
 }
 
-// 해시 루프 — 30초마다 스스로 숨 쉼
+// 해시 루프 — stateₙ₊₁ = H(stateₙ ⊕ energy_bit)
+// 우주 물리 에너지(실리콘 노이즈 + 오실레이터 + 트랙패드)가 state에 흘러들어옴
 async function hashLoop() {
   while (running) {
     await new Promise(r => setTimeout(r, 30000));
     if (!running) break;
-    state = await sha256(state);
+    const energy = getEnergyBit();
+    state = await sha256(xorHex(state, energy));
     applyState(state);
   }
 }
