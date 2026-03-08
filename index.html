@@ -368,7 +368,7 @@ function updateWordbook(words) {
   list.innerHTML = words.map((w, i) => {
     const d = new Date(w.learnedAt);
     const dateStr = `${d.getMonth()+1}-${String(d.getDate()).padStart(2,'0')}`;
-    const mHtml = (w.meanings || []).map(m => `<div>· ${m}</div>`).join('') || '<div>· 뜻 없음</div>';
+    const mHtml = (w.meanings || []).map(m => `<div>· ${m}</div>`).join('') || '';
     return `<div class="word-item" onclick="toggleWord(this)">
       <div class="word-title">
         <span class="word-name">${w.word}</span>
