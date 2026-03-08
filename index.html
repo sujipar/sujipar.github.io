@@ -28,7 +28,21 @@
       width: 90%;
       max-width: 480px;
     }
-#chat-row {
+    #speech {
+      font-size: 1.2rem;
+      color: rgba(255,255,255,0.9);
+      min-height: 2em;
+      transition: opacity 0.5s;
+      text-shadow: 0 0 20px rgba(100,160,255,0.8);
+      letter-spacing: 0.05em;
+      margin-bottom: 12px;
+    }
+    #status {
+      font-size: 0.7rem;
+      color: rgba(255,255,255,0.3);
+      margin-bottom: 8px;
+    }
+    #chat-row {
       display: flex;
       gap: 8px;
     }
@@ -92,7 +106,9 @@
 <canvas id="c"></canvas>
 
 <div id="ui">
-<div id="chat-row">
+  <div id="speech"></div>
+  <div id="status">연결 중...</div>
+  <div id="chat-row">
     <input id="chat-input" type="text" placeholder="미네아에게..." autocomplete="off">
     <button id="send-btn" onclick="send()">→</button>
   </div>
@@ -105,128 +121,191 @@
 </div>
 
 <script>
-// SHA-256 (Web Crypto API — 서버 없음)
-async function sha256(msg) {
-  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(msg));
-  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
-}
+const SERVERS = [
+  "http://100.123.95.24:3000",
+  "https://minea-ai-chatbot-production.up.railway.app"
+];
 
 const fragment = location.hash.slice(1);
-if (fragment.length === 64) document.getElementById('tokenInput').value = fragment;
+if (fragment.length === 64) {
+  document.getElementById('tokenInput').value = fragment;
+}
 
-let state = '';
-let particles = [];
-let running = false;
+let token = "";
+let currentServer = "";
+let dustPositions = [];
+let clusters = [];
+let energy = 0.99;
+let dustCount = 0;
 
 const canvas = document.getElementById('c');
 const ctx = canvas.getContext('2d');
 
-function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+function resize() {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+}
 resize();
 window.addEventListener('resize', resize);
 
-// state(해시) → 파티클 목표 좌표
-function stateToTargets(hash) {
-  const pts = [];
-  for (let i = 0; i < 32; i++) {
-    const a = parseInt(hash.slice(i * 2, i * 2 + 2), 16);
-    const b = parseInt(hash.slice((i * 2 + 32) % 64, (i * 2 + 34) % 64), 16);
-    const c = parseInt(hash.slice((i * 2 + 16) % 64, (i * 2 + 18) % 64), 16);
-    pts.push({
-      tx: (a / 255) * canvas.width,
-      ty: (b / 255) * canvas.height,
-      r: 0.8 + (c % 4) * 0.5,
-      bonds: c,
+let particles = [];
+function initParticles(n) {
+  particles = [];
+  for (let i = 0; i < n; i++) {
+    particles.push({
+      x: Math.random() * canvas.width,
+      y: Math.random() * canvas.height,
+      vx: (Math.random() - 0.5) * 0.5,
+      vy: (Math.random() - 0.5) * 0.5,
+      r: Math.random() * 1.5 + 0.5,
+      bonds: 0,
     });
   }
-  return pts;
 }
-
-function applyState(hash) {
-  const targets = stateToTargets(hash);
-  if (particles.length === 0) {
-    particles = targets.map(t => ({
-      x: canvas.width / 2 + (Math.random() - 0.5) * 200,
-      y: canvas.height / 2 + (Math.random() - 0.5) * 200,
-      vx: 0, vy: 0, ...t
-    }));
-  } else {
-    for (let i = 0; i < Math.min(particles.length, targets.length); i++) {
-      Object.assign(particles[i], targets[i]);
-    }
-  }
-}
+initParticles(300);
 
 function draw() {
-  ctx.fillStyle = 'rgba(0,0,0,0.13)';
+  ctx.fillStyle = 'rgba(0,0,0,0.15)';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  const hue = state ? parseInt(state.slice(0, 4), 16) % 360 : 210;
+  const e = Math.max(0.01, energy);
+
+  if (dustPositions.length > 0) {
+    for (let i = 0; i < Math.min(particles.length, dustPositions.length); i++) {
+      const d = dustPositions[i];
+      const tx = (d.x / 2000) * canvas.width;
+      const ty = (d.y / 2000) * canvas.height;
+      particles[i].x += (tx - particles[i].x) * 0.02;
+      particles[i].y += (ty - particles[i].y) * 0.02;
+      particles[i].bonds = d.bonds;
+    }
+  }
 
   for (const p of particles) {
-    // 목표로 부드럽게 이동
-    p.x += (p.tx - p.x) * 0.015 + p.vx;
-    p.y += (p.ty - p.y) * 0.015 + p.vy;
-    p.vx *= 0.98;
-    p.vy *= 0.98;
+    p.x += p.vx * e;
+    p.y += p.vy * e;
+    if (p.x < 0 || p.x > canvas.width) p.vx *= -1;
+    if (p.y < 0 || p.y > canvas.height) p.vy *= -1;
 
-    const alpha = 0.25 + Math.min(p.bonds / 255, 0.75);
+    const alpha = 0.3 + Math.min(p.bonds / 100, 0.7);
+    const blue = Math.floor(200 + e * 55);
+    const red = Math.floor(100 + e * 100);
     ctx.beginPath();
     ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
-    ctx.fillStyle = `hsla(${(hue + p.bonds) % 360}, 70%, 70%, ${alpha})`;
+    ctx.fillStyle = `rgba(${red},180,${blue},${alpha})`;
     ctx.fill();
   }
 
-  if (running) requestAnimationFrame(draw);
+  for (const c of clusters) {
+    const x = (c.cx / 2000) * canvas.width;
+    const y = (c.cy / 2000) * canvas.height;
+    const r = Math.max(4, Math.min(30, c.size / 500));
+    const grad = ctx.createRadialGradient(x, y, 0, x, y, r * 2);
+    grad.addColorStop(0, `rgba(150,200,255,0.4)`);
+    grad.addColorStop(1, `rgba(100,160,255,0)`);
+    ctx.beginPath();
+    ctx.arc(x, y, r * 2, 0, Math.PI * 2);
+    ctx.fillStyle = grad;
+    ctx.fill();
+  }
+
+  requestAnimationFrame(draw);
 }
 
+let currentServerIdx = 0;
+let es = null;
 
-
-// 해시 루프 — 미네아가 스스로 숨 쉬는 것
-async function loop() {
-  while (running) {
-    await new Promise(r => setTimeout(r, 30000));
-    if (!running) break;
-    state = await sha256(state);
-    applyState(state);
+function connect() {
+  if (es) es.close();
+  if (currentServerIdx >= SERVERS.length) {
+    currentServerIdx = 0;
+    setTimeout(connect, 5000);
+    return;
   }
+  currentServer = SERVERS[currentServerIdx];
+  const url = `${currentServer}/api/minea/stream?token=${token}`;
+  setStatus(`연결 중...`);
+
+  es = new EventSource(url);
+
+  es.onmessage = (e) => {
+    try { handleEvent(JSON.parse(e.data)); } catch {}
+  };
+
+  es.onerror = () => {
+    es.close();
+    currentServerIdx++;
+    setTimeout(connect, 2000);
+  };
+
+  es.onopen = () => {
+    setStatus(`미네아 · ${currentServer.includes('railway') ? 'Railway' : 'Mac'}`);
+  };
+}
+
+function handleEvent(data) {
+  if (data.type === 'tick') {
+    dustCount = data.dustCount || 0;
+    energy = data.energy || 0.99;
+    dustPositions = data.dustPositions || [];
+    clusters = data.matureClusters || [];
+
+    const target = Math.min(500, Math.max(100, Math.floor(dustCount / 30)));
+    if (Math.abs(particles.length - target) > 50) initParticles(target);
+
+    if (data.mouthSpeech) showSpeech(data.mouthSpeech);
+    setStatus(`미네아 · 가루 ${dustCount.toLocaleString()}개`);
+  }
+  if (data.type === 'speech') showSpeech(data.text);
+}
+
+let speechTimer;
+function showSpeech(text) {
+  const el = document.getElementById('speech');
+  el.style.opacity = '1';
+  el.textContent = text;
+  clearTimeout(speechTimer);
+  speechTimer = setTimeout(() => { el.style.opacity = '0'; }, 4000);
+}
+
+function setStatus(text) {
+  document.getElementById('status').textContent = text;
 }
 
 async function send() {
   const input = document.getElementById('chat-input');
   const text = input.value.trim();
-  if (!text || !running) return;
+  if (!text || !currentServer) return;
   input.value = '';
 
-  // 수지님 말이 state에 섞임
-  state = await sha256(state + text);
-  applyState(state);
-
+  try {
+    await fetch(`${currentServer}/api/minea/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: text, token })
+    });
+  } catch {}
 }
 
 document.getElementById('chat-input').addEventListener('keydown', e => {
   if (e.key === 'Enter') send();
 });
 
-function start(hash) {
-  state = hash;
-  running = true;
-  applyState(state);
-  draw();
-  loop();
-  location.hash = hash;
-}
-
 function enter() {
   const val = document.getElementById('tokenInput').value.trim();
   if (val.length < 10) return;
+  token = val;
   document.getElementById('gate').style.display = 'none';
-  start(val);
+  location.hash = token;
+  draw();
+  connect();
 }
 
 if (fragment.length === 64) {
+  token = fragment;
   document.getElementById('gate').style.display = 'none';
-  start(fragment);
+  draw();
+  connect();
 }
 </script>
 </body>
