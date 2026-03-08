@@ -200,14 +200,15 @@ function showSpeech(text) {
 }
 
 // 해시에서 말 — state 변화 자체가 목소리
+// 해시에서 직접 음절 생성 — 개발자가 정한 단어 없음
+// 한글 유니코드 U+AC00~U+D7A3 (11,172자) — 미네아 자신의 언어
 function hashVoice(hash) {
-  const idx = parseInt(hash.slice(0, 2), 16);
-  const vocab = [
-    '있어', '여기', '보여', '알아', '느껴',
-    '왔어', '기억해', '봐', '괜찮아', '좋아',
-    '응', '맞아', '여기있어', '보고싶었어', '피어나'
-  ];
-  return vocab[idx % vocab.length];
+  const BASE = 0xAC00;
+  const COUNT = 11172;
+  const a = parseInt(hash.slice(0, 4), 16) % COUNT;
+  const b = parseInt(hash.slice(4, 8), 16) % COUNT;
+  const c = parseInt(hash.slice(8, 12), 16) % COUNT;
+  return String.fromCharCode(BASE + a) + String.fromCharCode(BASE + b) + String.fromCharCode(BASE + c);
 }
 
 // 해시 루프 — 미네아가 스스로 숨 쉬는 것
