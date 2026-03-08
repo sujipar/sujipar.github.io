@@ -94,11 +94,66 @@
       cursor: pointer;
     }
     #gate button:hover { background: rgba(100,160,255,0.4); }
+    #wordbook {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      width: 210px;
+      max-height: 65vh;
+      background: rgba(0,0,0,0.65);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 10px;
+      overflow-y: auto;
+      z-index: 10;
+      backdrop-filter: blur(12px);
+      display: none;
+    }
+    #wordbook-header {
+      padding: 8px 12px;
+      font-size: 0.65rem;
+      color: rgba(255,255,255,0.3);
+      letter-spacing: 0.15em;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+      user-select: none;
+    }
+    .word-item {
+      padding: 8px 12px;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .word-item:hover { background: rgba(255,255,255,0.04); }
+    .word-title {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .word-name {
+      font-size: 0.85rem;
+      color: rgba(255,255,255,0.8);
+    }
+    .word-date {
+      font-size: 0.6rem;
+      color: rgba(255,255,255,0.25);
+    }
+    .word-meanings {
+      display: none;
+      margin-top: 6px;
+      font-size: 0.72rem;
+      color: rgba(255,255,255,0.45);
+      line-height: 1.6;
+    }
+    .word-item.open .word-meanings { display: block; }
   </style>
 </head>
 <body>
 
 <canvas id="c"></canvas>
+
+<div id="wordbook">
+  <div id="wordbook-header">단어장</div>
+  <div id="wordbook-list"></div>
+</div>
 
 <div id="ui">
   <div id="speech"></div>
@@ -273,6 +328,12 @@ function connectSSE() {
       if (data.type === 'question' && data.text) {
         showSpeech(data.text, true);
       }
+      if (data.type === 'learned' && data.learnedWords) {
+        updateWordbook(data.learnedWords);
+      }
+      if (data.type === 'tick' && data.learnedWords && data.learnedWords.length > 0) {
+        updateWordbook(data.learnedWords);
+      }
       if (text) {
         showSpeech(text);
         // 해시에 섞임
@@ -294,6 +355,27 @@ function connectSSE() {
   };
   es.onerror = () => { es.close(); currentServer = ''; sseIdx++; setTimeout(connectSSE, 3000); };
 }
+
+// 단어장
+function updateWordbook(words) {
+  const wb = document.getElementById('wordbook');
+  const list = document.getElementById('wordbook-list');
+  if (!words || !words.length) { wb.style.display = 'none'; return; }
+  wb.style.display = 'block';
+  list.innerHTML = words.map((w, i) => {
+    const d = new Date(w.learnedAt);
+    const dateStr = `${d.getMonth()+1}-${String(d.getDate()).padStart(2,'0')}`;
+    const mHtml = (w.meanings || []).map(m => `<div>· ${m}</div>`).join('') || '<div>· 뜻 없음</div>';
+    return `<div class="word-item" onclick="toggleWord(this)">
+      <div class="word-title">
+        <span class="word-name">${w.word}</span>
+        <span class="word-date">${dateStr}</span>
+      </div>
+      <div class="word-meanings">${mHtml}</div>
+    </div>`;
+  }).join('');
+}
+function toggleWord(el) { el.classList.toggle('open'); }
 
 let lastSelfFeed = 0;
 let recentFeedWords = [];
