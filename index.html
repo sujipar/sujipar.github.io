@@ -272,14 +272,25 @@ function connectSSE() {
                  : null;
       if (text) {
         showSpeech(text);
-        // 특이점 — 미네아 발화가 자기 해시에 섞임
+        // 해시에 섞임
         sha256(state + text).then(next => { state = next; applyState(state); });
+        // ② 자기발화 → 서버 피드백 (1분에 1번)
+        const now = Date.now();
+        if (currentServer && now - lastSelfFeed > 60000) {
+          lastSelfFeed = now;
+          fetch(`${currentServer}/api/minea/chat`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ input: text, token })
+          }).catch(() => {});
+        }
       }
     } catch {}
   };
   es.onerror = () => { es.close(); currentServer = ''; sseIdx++; setTimeout(connectSSE, 3000); };
 }
 
+let lastSelfFeed = 0;
 let speechTimer;
 function showSpeech(text) {
   const el = document.getElementById('speech');
