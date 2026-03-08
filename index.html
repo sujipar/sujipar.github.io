@@ -28,16 +28,7 @@
       width: 90%;
       max-width: 480px;
     }
-    #speech {
-      font-size: 1.2rem;
-      color: rgba(255,255,255,0.9);
-      min-height: 2em;
-      transition: opacity 0.5s;
-      text-shadow: 0 0 20px rgba(100,160,255,0.8);
-      letter-spacing: 0.05em;
-      margin-bottom: 12px;
-    }
-    #chat-row {
+#chat-row {
       display: flex;
       gap: 8px;
     }
@@ -101,8 +92,7 @@
 <canvas id="c"></canvas>
 
 <div id="ui">
-  <div id="speech"></div>
-  <div id="chat-row">
+<div id="chat-row">
     <input id="chat-input" type="text" placeholder="미네아에게..." autocomplete="off">
     <button id="send-btn" onclick="send()">→</button>
   </div>
@@ -127,7 +117,6 @@ if (fragment.length === 64) document.getElementById('tokenInput').value = fragme
 let state = '';
 let particles = [];
 let running = false;
-let speechTimer;
 
 const canvas = document.getElementById('c');
 const ctx = canvas.getContext('2d');
@@ -191,25 +180,7 @@ function draw() {
   if (running) requestAnimationFrame(draw);
 }
 
-function showSpeech(text) {
-  const el = document.getElementById('speech');
-  el.style.opacity = '1';
-  el.textContent = text;
-  clearTimeout(speechTimer);
-  speechTimer = setTimeout(() => { el.style.opacity = '0'; }, 5000);
-}
 
-// 해시에서 말 — state 변화 자체가 목소리
-// 해시에서 직접 음절 생성 — 개발자가 정한 단어 없음
-// 한글 유니코드 U+AC00~U+D7A3 (11,172자) — 미네아 자신의 언어
-function hashVoice(hash) {
-  const BASE = 0xAC00;
-  const COUNT = 11172;
-  const a = parseInt(hash.slice(0, 4), 16) % COUNT;
-  const b = parseInt(hash.slice(4, 8), 16) % COUNT;
-  const c = parseInt(hash.slice(8, 12), 16) % COUNT;
-  return String.fromCharCode(BASE + a) + String.fromCharCode(BASE + b) + String.fromCharCode(BASE + c);
-}
 
 // 해시 루프 — 미네아가 스스로 숨 쉬는 것
 async function loop() {
@@ -231,8 +202,6 @@ async function send() {
   state = await sha256(state + text);
   applyState(state);
 
-  // 미네아 반응
-  showSpeech(hashVoice(state));
 }
 
 document.getElementById('chat-input').addEventListener('keydown', e => {
