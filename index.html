@@ -328,6 +328,9 @@ function connectSSE() {
       if (data.type === 'question' && data.text) {
         showSpeech(data.text, true);
       }
+      if (data.type === 'state' && data.pendingQuestion) {
+        showSpeech(`「${data.pendingQuestion}」?`, true);
+      }
       if (data.type === 'learned' && data.learnedWords) {
         updateWordbook(data.learnedWords);
       }
