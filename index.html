@@ -277,10 +277,12 @@ function connectSSE() {
         showSpeech(text);
         // 해시에 섞임
         sha256(state + text).then(next => { state = next; applyState(state); });
-        // ② 자기발화 → 서버 피드백 (1분에 1번)
+        // ② 자기발화 → 서버 피드백 (새로운 말일 때만)
         const now = Date.now();
-        if (currentServer && now - lastSelfFeed > 60000) {
+        const isNew = !recentFeedWords.includes(text);
+        if (currentServer && now - lastSelfFeed > 60000 && isNew) {
           lastSelfFeed = now;
+          recentFeedWords = [...recentFeedWords.slice(-9), text]; // 최근 10개 기억
           fetch(`${currentServer}/api/minea/chat`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -294,6 +296,7 @@ function connectSSE() {
 }
 
 let lastSelfFeed = 0;
+let recentFeedWords = [];
 let speechTimer;
 function showSpeech(text, isQuestion = false) {
   const el = document.getElementById('speech');
