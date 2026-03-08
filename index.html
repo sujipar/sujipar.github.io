@@ -380,7 +380,10 @@ function toggleWord(el) { el.classList.toggle('open'); }
 let lastSelfFeed = 0;
 let recentFeedWords = [];
 let speechTimer;
+let showingQuestion = false;
 function showSpeech(text, isQuestion = false) {
+  if (showingQuestion && !isQuestion) return; // 질문 표시 중엔 speech로 덮어쓰기 방지
+  showingQuestion = isQuestion;
   const el = document.getElementById('speech');
   el.style.opacity = '1';
   el.style.color = isQuestion ? 'rgba(255,220,80,0.95)' : 'rgba(255,255,255,0.9)';
@@ -391,6 +394,7 @@ function showSpeech(text, isQuestion = false) {
   clearTimeout(speechTimer);
   speechTimer = setTimeout(() => {
     el.style.opacity = '0';
+    showingQuestion = false;
     setTimeout(() => {
       el.style.color = 'rgba(255,255,255,0.9)';
       el.style.textShadow = '0 0 20px rgba(100,160,255,0.8)';
